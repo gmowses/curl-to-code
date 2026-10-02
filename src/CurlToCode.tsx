@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useState, useCallback } from 'react'
 import { Sun, Moon, Languages, Copy, Check, Terminal, AlertCircle } from 'lucide-react'
 
@@ -68,7 +69,7 @@ function tokenizeCurl(cmd: string): string[] {
   return tokens
 }
 
-function parseCurl(cmd: string): ParsedCurl | null {
+export function parseCurl(cmd: string): ParsedCurl | null {
   const tokens = tokenizeCurl(cmd.replace(/\\\n/g, ' '))
   if (!tokens[0]?.toLowerCase().startsWith('curl')) return null
   let i = 1
@@ -102,35 +103,32 @@ function parseCurl(cmd: string): ParsedCurl | null {
   return { url: url || 'https://example.com', method, headers, body, auth }
 }
 
-function toPython(p: ParsedCurl): string {
-  const lines: string[] = ['import requests', '']
-  if (p.auth) lines.push(`auth = ('${p.auth.user}', '${p.auth.pass}')`)
+const pythonString = (value: string) => JSON.stringify(value)
+const jsString = (value: string) => JSON.stringify(value)
+const goString = (value: string) => JSON.stringify(value)
+const phpString = (value: string) => `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 
-  const hasJson = p.headers['Content-Type']?.includes('application/json')
+export function toPython(p: ParsedCurl): string {
+  const lines: string[] = ['import requests', '']
+  if (p.auth) lines.push(`auth = (${pythonString(p.auth.user)}, ${pythonString(p.auth.pass)})`)
+
   if (p.headers && Object.keys(p.headers).length) {
     lines.push('headers = {')
-    for (const [k, v] of Object.entries(p.headers)) lines.push(`    '${k}': '${v}',`)
+    for (const [k, v] of Object.entries(p.headers)) lines.push(`    ${pythonString(k)}: ${pythonString(v)},`)
     lines.push('}')
   }
 
   if (p.body) {
-    if (hasJson) {
-      try { lines.push(`json_data = ${JSON.stringify(JSON.parse(p.body), null, 4).split('\n').join('\n')}`) }
-      catch { lines.push(`data = '${p.body.replace(/'/g, "\\'")}'`) }
-    } else {
-      lines.push(`data = '${p.body.replace(/'/g, "\\'")}'`)
-    }
+    lines.push(`data = ${pythonString(p.body)}`)
   }
 
   lines.push('')
-  const method = p.method.toLowerCase()
-  const args: string[] = [`'${p.url}'`]
+  const args: string[] = [pythonString(p.method), pythonString(p.url)]
   if (Object.keys(p.headers).length) args.push('headers=headers')
-  if (p.body && hasJson) args.push('json=json_data')
-  else if (p.body) args.push('data=data')
+  if (p.body) args.push('data=data')
   if (p.auth) args.push('auth=auth')
 
-  lines.push(`response = requests.${method}(`)
+  lines.push('response = requests.request(')
   args.forEach((a, i) => lines.push(`    ${a}${i < args.length - 1 ? ',' : ''}`))
   lines.push(')')
   lines.push('')
@@ -139,33 +137,32 @@ function toPython(p: ParsedCurl): string {
   return lines.join('\n')
 }
 
-function toJavaScript(p: ParsedCurl): string {
+export function toJavaScript(p: ParsedCurl): string {
   const lines: string[] = []
-  const hasJson = p.headers['Content-Type']?.includes('application/json')
+  const headers = { ...p.headers }
 
   if (p.auth) {
-    lines.push(`const credentials = btoa('${p.auth.user}:${p.auth.pass}')`)
-    p.headers['Authorization'] = '${`Basic ${credentials}`}'
+    lines.push(`const credentials = btoa(${jsString(`${p.auth.user}:${p.auth.pass}`)})`)
+    headers.Authorization = 'Basic credentials'
     lines.push('')
   }
 
   lines.push('const response = await fetch(')
-  lines.push(`  '${p.url}',`)
+  lines.push(`  ${jsString(p.url)},`)
   lines.push('  {')
-  lines.push(`    method: '${p.method}',`)
+  lines.push(`    method: ${jsString(p.method)},`)
 
-  if (Object.keys(p.headers).length) {
+  if (Object.keys(headers).length) {
     lines.push('    headers: {')
-    for (const [k, v] of Object.entries(p.headers)) {
-      if (k === 'Authorization' && p.auth) lines.push(`      '${k}': \`Basic \${btoa('${p.auth.user}:${p.auth.pass}')}\`,`)
-      else lines.push(`      '${k}': '${v}',`)
+    for (const [k, v] of Object.entries(headers)) {
+      if (k === 'Authorization' && p.auth) lines.push(`      ${jsString(k)}: \`Basic \${credentials}\`,`)
+      else lines.push(`      ${jsString(k)}: ${jsString(v)},`)
     }
     lines.push('    },')
   }
 
   if (p.body) {
-    if (hasJson) lines.push(`    body: JSON.stringify(${p.body}),`)
-    else lines.push(`    body: '${p.body.replace(/'/g, "\\'")}',`)
+    lines.push(`    body: ${jsString(p.body)},`)
   }
 
   lines.push('  }')
@@ -176,7 +173,7 @@ function toJavaScript(p: ParsedCurl): string {
   return lines.join('\n')
 }
 
-function toGo(p: ParsedCurl): string {
+export function toGo(p: ParsedCurl): string {
   const lines: string[] = [
     'package main',
     '',
@@ -184,25 +181,25 @@ function toGo(p: ParsedCurl): string {
     '  "fmt"',
     '  "io"',
     '  "net/http"',
-    '  "strings"',
+    ...(p.body ? ['  "strings"'] : []),
     ')',
     '',
     'func main() {',
   ]
 
   if (p.body) {
-    lines.push(`  body := strings.NewReader(\`${p.body}\`)`)
-    lines.push(`  req, _ := http.NewRequest("${p.method}", "${p.url}", body)`)
+    lines.push(`  body := strings.NewReader(${goString(p.body)})`)
+    lines.push(`  req, _ := http.NewRequest(${goString(p.method)}, ${goString(p.url)}, body)`)
   } else {
-    lines.push(`  req, _ := http.NewRequest("${p.method}", "${p.url}", nil)`)
+    lines.push(`  req, _ := http.NewRequest(${goString(p.method)}, ${goString(p.url)}, nil)`)
   }
 
   for (const [k, v] of Object.entries(p.headers)) {
-    lines.push(`  req.Header.Set("${k}", "${v}")`)
+    lines.push(`  req.Header.Set(${goString(k)}, ${goString(v)})`)
   }
 
   if (p.auth) {
-    lines.push(`  req.SetBasicAuth("${p.auth.user}", "${p.auth.pass}")`)
+    lines.push(`  req.SetBasicAuth(${goString(p.auth.user)}, ${goString(p.auth.pass)})`)
   }
 
   lines.push('')
@@ -218,24 +215,24 @@ function toGo(p: ParsedCurl): string {
   return lines.join('\n')
 }
 
-function toPHP(p: ParsedCurl): string {
+export function toPHP(p: ParsedCurl): string {
   const lines: string[] = ['<?php', '', '$ch = curl_init();', '']
-  lines.push(`curl_setopt($ch, CURLOPT_URL, '${p.url}');`)
+  lines.push(`curl_setopt($ch, CURLOPT_URL, ${phpString(p.url)});`)
   lines.push('curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);')
 
   if (p.method !== 'GET') {
     if (p.method === 'POST') lines.push('curl_setopt($ch, CURLOPT_POST, true);')
-    else lines.push(`curl_setopt($ch, CURLOPT_CUSTOMREQUEST, '${p.method}');`)
+    else lines.push(`curl_setopt($ch, CURLOPT_CUSTOMREQUEST, ${phpString(p.method)});`)
   }
 
   if (Object.keys(p.headers).length) {
     lines.push('curl_setopt($ch, CURLOPT_HTTPHEADER, [')
-    for (const [k, v] of Object.entries(p.headers)) lines.push(`    '${k}: ${v}',`)
+    for (const [k, v] of Object.entries(p.headers)) lines.push(`    ${phpString(`${k}: ${v}`)},`)
     lines.push(']);')
   }
 
-  if (p.body) lines.push(`curl_setopt($ch, CURLOPT_POSTFIELDS, '${p.body.replace(/'/g, "\\'")}');`)
-  if (p.auth) lines.push(`curl_setopt($ch, CURLOPT_USERPWD, '${p.auth.user}:${p.auth.pass}');`)
+  if (p.body) lines.push(`curl_setopt($ch, CURLOPT_POSTFIELDS, ${phpString(p.body)});`)
+  if (p.auth) lines.push(`curl_setopt($ch, CURLOPT_USERPWD, ${phpString(`${p.auth.user}:${p.auth.pass}`)});`)
 
   lines.push('')
   lines.push('$response = curl_exec($ch);')

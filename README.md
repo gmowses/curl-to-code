@@ -1,80 +1,26 @@
-# Password Generator
+# curl to Code
 
-Secure password generator with entropy analysis and crack-time estimation. Everything runs client-side -- no data is sent to any server.
-
-**[Live Demo](https://gmowses.github.io/password-generator)**
+Convert a limited set of curl commands into request examples for Python, JavaScript, Go, and PHP.
 
 ## Features
 
-- **Cryptographic randomness** -- uses `crypto.getRandomValues()` for true randomness
-- **Entropy calculation** -- Shannon entropy in bits based on character pool
-- **Crack-time estimation** -- time to brute-force at 4 billion guesses/second (GPU baseline)
-- **Strength meter** -- 5-level visual indicator (Very Weak to Very Strong)
-- **Configurable charsets** -- numbers, lowercase, uppercase, symbols (toggle independently)
-- **Length control** -- 4 to 128 characters with slider and +/- buttons
-- **Guaranteed charset inclusion** -- at least one character from each selected type
-- **Dark / Light mode** -- toggle or auto-detect from system preference
-- **i18n** -- English and Portuguese (auto-detect from browser language)
-- **Copy to clipboard** -- one-click copy with visual feedback
-- **Zero dependencies on backend** -- pure client-side, works offline
+- Supports URLs, `-X`/`--request`, `-H`/`--header`, `-d` data flags, and `-u`/`--user`
+- Generates escaped string literals for Python requests, browser fetch, Go net/http, and PHP cURL
+- English and Portuguese UI with light and dark themes
 
-## Tech Stack
-
-- React 19
-- TypeScript
-- Tailwind CSS v4
-- Vite
-- Lucide icons
-
-## Getting Started
+## Local development
 
 ```bash
-git clone https://github.com/gmowses/password-generator.git
-cd password-generator
 npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` in your browser.
+Open the URL printed by Vite. Use `npm run lint`, `npm test`, and `npm run build` before changes are submitted.
 
-## Build
+## Data and limits
 
-```bash
-npm run build
-```
-
-Static files are generated in `dist/`.
-
-## How It Works
-
-### Entropy
-
-Entropy is calculated as `log2(pool_size ^ password_length)`, where `pool_size` is the total number of possible characters based on selected charsets:
-
-| Charset | Pool Size |
-|---------|-----------|
-| Numbers (0-9) | 10 |
-| Lowercase (a-z) | 26 |
-| Uppercase (A-Z) | 26 |
-| Symbols | 30 |
-
-### Crack Time
-
-Estimated time to brute-force the password assuming:
-- Offline attack with modern GPUs
-- 4 billion guesses per second
-- No password reuse or pattern detection
-
-### Strength Levels
-
-| Entropy | Level |
-|---------|-------|
-| < 28 bits | Very Weak |
-| 28-35 bits | Weak |
-| 36-59 bits | Fair |
-| 60-127 bits | Strong |
-| 128+ bits | Very Strong |
+Conversion runs entirely in the browser; commands are not sent to a server. This is a convenience converter, not a complete shell or curl parser. Complex shell expansion, command substitution, multipart uploads, cookie jars, proxies, certificates, redirects, and every curl flag are outside its supported scope. Review generated code and never paste secrets into untrusted environments.
 
 ## License
 
-[MIT](LICENSE) -- Gabriel Mowses
+[MIT](LICENSE)
