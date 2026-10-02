@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import { parseCurl, toGo, toJavaScript, toPHP, toPython } from '../src/CurlToCode.tsx'
 
@@ -35,8 +38,16 @@ test('generated JavaScript, Go, and PHP parse without evaluating requests', () =
   assert.ok(parsed)
   const js = spawnSync('node', ['--input-type=module', '--check'], { input: toJavaScript(parsed) })
   const go = spawnSync('gofmt', ['-d'], { input: toGo(parsed) })
-  const php = spawnSync('php', ['-l', '/dev/stdin'], { input: toPHP(parsed) })
+  const tempDirectory = mkdtempSync(join(tmpdir(), 'curl-to-code-'))
+  const phpFile = join(tempDirectory, 'generated-request.php')
+  let php
+  try {
+    writeFileSync(phpFile, toPHP(parsed))
+    php = spawnSync('php', ['-l', phpFile])
+  } finally {
+    rmSync(tempDirectory, { recursive: true, force: true })
+  }
   assert.equal(js.status, 0, js.stderr.toString())
   assert.equal(go.status, 0, go.stderr.toString())
-  assert.equal(php.status, 0, php.stderr.toString())
+  assert.equal(php?.status, 0, php?.stderr.toString())
 })
